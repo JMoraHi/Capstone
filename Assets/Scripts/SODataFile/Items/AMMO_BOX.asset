@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1af04de667da380488157eb164bdf7a3, type: 3}
+  m_Name: AMMO_BOX
+  m_EditorClassIdentifier: 
+  itemName: Ammo BOX
+  itemID: 211
+  itemValue: 1
+  itemType: 2
+  weaponType: 0
+  WeaponFireRateCD: 0
+  WeaponDamage: 0
+  DefaultWeaponAmmo: 100
+  itemIcon: {fileID: 0}
+  itemPrefab: {fileID: 0}
+  itemWorldPrefab: {fileID: 0}

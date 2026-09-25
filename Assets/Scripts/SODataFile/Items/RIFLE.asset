@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1af04de667da380488157eb164bdf7a3, type: 3}
+  m_Name: RIFLE
+  m_EditorClassIdentifier: 
+  itemName: MA41
+  itemID: 111
+  itemValue: 1
+  itemType: 0
+  weaponType: 0
+  WeaponFireRateCD: 0.1
+  WeaponDamage: 5
+  DefaultWeaponAmmo: 100
+  itemIcon: {fileID: 0}
+  itemPrefab: {fileID: 0}
+  itemWorldPrefab: {fileID: 1251914068903613313, guid: e55b2df9f96ae6047a72e041cf06c41a, type: 3}

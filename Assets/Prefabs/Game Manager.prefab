@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &98129330304221066
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9107200833299421289}
+  - component: {fileID: 165543383423854392}
+  m_Layer: 3
+  m_Name: Game Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9107200833299421289
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98129330304221066}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &165543383423854392
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98129330304221066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 133ca66ec7050bd4c96da6a8860b45ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  weaponSpawnEvent: {fileID: 11400000, guid: a7b1bdd6673a46d40af4012d979d1c2a, type: 2}
+  ammoSpawnEvent: {fileID: 11400000, guid: 1abb612449c608247a1b0685d8cb7033, type: 2}
+  characterSpawnerEvent: {fileID: 11400000, guid: e4850b24e7292494088a2b46bf46cb7a, type: 2}
+  onChangeAliveEnemies: {fileID: 11400000, guid: 8310d9e5518b1ea468e2da462f532fa8, type: 2}
+  onGameOver: {fileID: 11400000, guid: 013e05ea1c6b6d4438bd387dc96f90f9, type: 2}
+  onAlreadyGameOver: {fileID: 11400000, guid: f8c5169f6e264d94da10e8dbbd1efd69, type: 2}
+  onRestartGame: {fileID: 11400000, guid: a66e1c08cb7e354448cfb755f3945925, type: 2}
+  onLevelChangeEvents: {fileID: 11400000, guid: 221a6ab6d182f7d4aab8ce9a9cf2ff56, type: 2}
+  onStartNewGameEvents: {fileID: 11400000, guid: 507ac5c8d353b1940a507acef1e20a99, type: 2}
+  onPlayerHPChangeEvent: {fileID: 11400000, guid: 05656bb0ca9c92042b1a852905165b4a, type: 2}
+  onAmmoChangeEvent: {fileID: 11400000, guid: 4fbbf30625c6ddc449d5a337f289e603, type: 2}
+  _controlledCharacterSpawnEvent: {fileID: 11400000, guid: 519a540ddb103ad4b840d784a1892d51, type: 2}
+  _followPlayerCameraEvent: {fileID: 11400000, guid: 0c0f2729cb366384a835bbdfa119d9ec, type: 2}
+  weaponSpawnerPoint: {fileID: 0}
+  playersTransformPoint: {fileID: 0}
+  spawnRadius: 400
+  minSpawnDistance: 60
+  totalAliveEnemies: 0
+  currentAliveEnemies: 0
+  easyDifficulty: {fileID: 11400000, guid: 38dbf401e378b9f44bf04289084a541b, type: 2}
+  normalDifficulty: {fileID: 11400000, guid: f50449c7b4f6ccb479934e41613d702f, type: 2}
+  hardDifficulty: {fileID: 11400000, guid: 0399e73babf081d4b9545195563a457d, type: 2}
+  asianDifficulty: {fileID: 11400000, guid: 8f337100e21f3ee4ea1099c9a17274d4, type: 2}
+  defaultGameLevel: 0
+  currentGameLevel: 0
