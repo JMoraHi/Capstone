@@ -17,7 +17,7 @@ MonoBehaviour:
       m_Calls: []
   eventName: CharacterSpawnEvent
   eventDescription: Event to spawn a character
-  characterPrefab: {fileID: 2416803865819781619, guid: b9092b0c97c294c4794856014cb7a6a4, type: 3}
+  characterPrefab: {fileID: 2416803865819781619, guid: 38d12b82c1c007b418749b110008b5bd, type: 3}
   characterCount: 1
   spawnRate: 1
   spawnRadius: 1
