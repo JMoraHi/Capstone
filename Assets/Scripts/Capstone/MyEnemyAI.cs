@@ -18,7 +18,7 @@ public class MyEnemyAI : MonoBehaviour
     // Start with the patrol behavior we've already built.
     // SerializeField lets us see the current state in the Inspector.
     [SerializeField] private AIState currentState = AIState.Patrolling;
-        // Stores the enemy's movement component.
+    // Stores the enemy's movement component.
     private NavMeshAgent agent;
 
     // References this enemy's existing health component.
@@ -36,7 +36,7 @@ public class MyEnemyAI : MonoBehaviour
     [SerializeField] private float patrolRadius = 100f;
     // Prevents the enemy from choosing a spot too close to itself.
     [SerializeField] private float minimumPatrolDistance = 20f;
-    
+
 
     // How many seconds the enemy pauses after reaching a spot.
     [SerializeField] private float waitTime = 2f;
@@ -45,7 +45,28 @@ public class MyEnemyAI : MonoBehaviour
     // Each spawned enemy has its own timer.
     private float waitTimer = 0f;
 
-   private void Start()
+    [Header("Weapon Search Settings")]
+
+    // How far away the enemy can notice weapon pickups.
+    [SerializeField] private float weaponSearchRadius = 25f;
+
+    // How many seconds to wait between searches.
+    // This avoids searching every single frame.
+    [SerializeField] private float weaponSearchInterval = 1f;
+
+    // Counts down until the next search.
+    // Starting at zero lets the first search happen immediately
+    // once we connect the search logic.
+    private float weaponSearchTimer = 0f;
+
+    // Remembers the pickup this enemy wants to collect.
+    private LootItem targetWeapon;
+
+    // Tracks whether our new AI has collected a weapon.
+    // Enemies begin unarmed.
+    private bool hasWeapon = false;
+
+    private void Start()
     {
         // Finds this enemy's health component.
         enemyHealth = GetComponent<Health>();
@@ -68,50 +89,74 @@ public class MyEnemyAI : MonoBehaviour
     }
 
     private void Update()
-{
-    // Skip movement checks if the agent isn't ready.
-    if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh)
-        return;
-
-    // Death takes priority over patrolling.
-    if (enemyHealth != null && enemyHealth.isDead)
     {
-        currentState = AIState.Dead;
-        agent.isStopped = true;
-        agent.ResetPath();
-        return;
+        // Skip movement checks if the agent isn't ready.
+        if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh)
+            return;
+
+        // Death takes priority over patrolling.
+        if (enemyHealth != null && enemyHealth.isDead)
+        {
+            currentState = AIState.Dead;
+            agent.isStopped = true;
+            agent.ResetPath();
+            return;
+        }
+
+        // Handle traveling toward a weapon.
+        if (currentState == AIState.SearchingForWeapon)
+        {
+            // If the pickup disappeared, return to patrolling.
+            // Another character might have collected it.
+            if (targetWeapon == null)
+            {
+                currentState = AIState.Patrolling;
+                waitTimer = 0f;
+
+                // Respect stops requested by other game systems.
+                if (!agent.isStopped)
+                    ChoosePatrolDestination();
+            }
+
+            // Don't run the patrol logic while pursuing a weapon.
+            return;
+        }
+
+        // Other states don't have their behavior implemented yet.
+        if (currentState != AIState.Patrolling)
+            return;
+
+        // Don't patrol while other game systems have stopped us.
+        if (agent.isStopped)
+        {
+            return;
+        }
+
+        // Look for a weapon while continuing our patrol.
+        SearchForWeapon();
+
+        // Wait while Unity is calculating the path.
+        if (agent.pathPending)
+            return;
+
+        // If we're still traveling, reset the waiting timer.
+        if (agent.hasPath &&
+            agent.remainingDistance > Mathf.Max(agent.stoppingDistance, 0.2f))
+        {
+            waitTimer = 0f;
+            return;
+        }
+
+        // Count how long we've been waiting.
+        waitTimer += Time.deltaTime;
+
+        // After waiting, try choosing another patrol destination.
+        if (waitTimer >= waitTime)
+        {
+            waitTimer = 0f;
+            ChoosePatrolDestination();
+        }
     }
-
-    // Only patrol when we're in the Patrolling state.
-    if (currentState != AIState.Patrolling)
-        return;
-
-    // Don't patrol while other game systems have stopped us.
-    if (agent.isStopped)
-        return;
-
-    // Wait while Unity is calculating the path.
-    if (agent.pathPending)
-        return;
-
-    // If we're still traveling, reset the waiting timer.
-    if (agent.hasPath &&
-        agent.remainingDistance > Mathf.Max(agent.stoppingDistance, 0.2f))
-    {
-        waitTimer = 0f;
-        return;
-    }
-
-    // Count how long we've been waiting.
-    waitTimer += Time.deltaTime;
-
-    // After waiting, try choosing another patrol destination.
-    if (waitTimer >= waitTime)
-    {
-        waitTimer = 0f;
-        ChoosePatrolDestination();
-    }
-}
 
     private void ChoosePatrolDestination()
     {
@@ -181,4 +226,114 @@ public class MyEnemyAI : MonoBehaviour
         return item.itemStat.itemType == ItemType.Weapon;
     }
 
-} 
+    private LootItem FindNearestWeapon()
+    {
+        // We need a working agent to check paths.
+        if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh)
+            return null;
+
+        // Find nearby colliders, including pickup triggers.
+        // ~0 means search every physics layer.
+        Collider[] nearbyObjects = Physics.OverlapSphere(
+            transform.position,
+            weaponSearchRadius,
+            ~0,
+            QueryTriggerInteraction.Collide);
+
+        LootItem nearestWeapon = null;
+        float nearestDistance = Mathf.Infinity;
+
+        // Reuse this object to check each candidate's path.
+        NavMeshPath path = new NavMeshPath();
+
+        foreach (Collider nearbyObject in nearbyObjects)
+        {
+            // Look for a LootItem on the collider or its parent.
+            LootItem item = nearbyObject.GetComponentInParent<LootItem>();
+
+            // Skip anything that isn't a weapon.
+            if (!IsWeapon(item))
+                continue;
+
+            // Measure straight-line distance to the pickup.
+            float distance = Vector3.Distance(
+                transform.position, item.transform.position);
+
+            // Skip pickups outside our range or farther than our best match.
+            if (distance > weaponSearchRadius || distance >= nearestDistance)
+                continue;
+
+            // Only accept a weapon if Unity finds a complete path.
+            if (!agent.CalculatePath(item.transform.position, path)
+                || path.status != NavMeshPathStatus.PathComplete)
+                continue;
+
+            // Remember this as the closest suitable weapon so far.
+            nearestWeapon = item;
+            nearestDistance = distance;
+        }
+
+        // Returns null if no suitable weapon was found.
+        return nearestWeapon;
+    }
+
+    private void SearchForWeapon()
+    {
+        // No need to search if we're armed
+        // or already have a weapon pickup selected.
+        if (hasWeapon || targetWeapon != null)
+            return;
+
+        // Count down the time until our next search.
+        weaponSearchTimer -= Time.deltaTime;
+
+        if (weaponSearchTimer > 0f)
+            return;
+
+        // Reset the timer so we don't search every frame.
+        weaponSearchTimer = weaponSearchInterval;
+
+        // Find and remember a suitable weapon pickup.
+        targetWeapon = FindNearestWeapon();
+
+        if (targetWeapon != null)
+        {
+            // Switch from patrolling to collecting this weapon.
+            currentState = AIState.SearchingForWeapon;
+
+            // Clear the patrol waiting timer.
+            waitTimer = 0f;
+
+            // Replace the patrol destination with the weapon's position.
+            agent.SetDestination(targetWeapon.transform.position);
+
+            Debug.Log(
+                gameObject.name + " is heading toward: "
+                + targetWeapon.itemStat.itemName,
+                gameObject);
+        }
+    }
+
+    // The pickup script will call this after we collect a weapon.
+    public void OnWeaponCollected()
+    {
+        // Remember that this enemy is now armed.
+        hasWeapon = true;
+
+        // Stop tracking the pickup we just collected.
+        targetWeapon = null;
+
+        // Patrol until we add opponent detection.
+        currentState = AIState.Patrolling;
+        waitTimer = 0f;
+
+        // Clear the old path and allow our patrol timer to run.
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.ResetPath();
+            agent.isStopped = false;
+        }
+
+        Debug.Log(gameObject.name + " collected a weapon.", gameObject);
+    }
+}
