@@ -23,7 +23,23 @@ public class LootItem : MonoBehaviour
                 playerShoot.OnGettingItems(this.itemStat);
                 
             }
-            if(other.TryGetComponent(out EnemyController enemyController)){
+            //if(other.TryGetComponent(out EnemyController enemyController)){ //Original Script
+            //    enemyController.SearchForPlayer();
+            //}
+
+            // Use our new AI when the character has it.
+            if (other.TryGetComponent(out MyEnemyAI myEnemyAI))
+            {
+                // Our AI currently collects only weapons.
+                if (itemStat == null || itemStat.itemType != ItemType.Weapon)
+                    return;
+
+                // Remember the weapon and show the rifle.
+                myEnemyAI.OnWeaponCollected();
+            }
+            // Keep the original behavior for enemies without our new AI.
+            else if (other.TryGetComponent(out EnemyController enemyController))
+            {
                 enemyController.SearchForPlayer();
             }
             Destroy(gameObject);

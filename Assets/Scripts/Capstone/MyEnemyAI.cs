@@ -66,8 +66,36 @@ public class MyEnemyAI : MonoBehaviour
     // Enemies begin unarmed.
     private bool hasWeapon = false;
 
+    // The rifle model already attached to this enemy.
+    [SerializeField] private GameObject weaponModel;
+
+    [Header("Opponent Detection")]
+
+    // How far the enemy can search for another character.
+    [SerializeField] private float detectionRadius = 30f;
+
+    // How often we check for nearby opponents, in seconds.
+    [SerializeField] private float opponentSearchInterval = 0.5f;
+
+    // Counts down until the next search.
+    private float opponentSearchTimer = 0f;
+
+    // Remembers the character we want to chase.
+    // Using Health lets us check whether that character is alive.
+    private Health targetOpponent;
+
+    // How often we update the route to a moving opponent.
+    [SerializeField] private float chaseUpdateInterval = 0.5f;
+    private float chaseTimer = 0f;
+
     private void Start()
     {
+        // Enemies begin without a visible weapon.
+        if (weaponModel != null)
+        {
+            weaponModel.SetActive(false);
+        }
+
         // Finds this enemy's health component.
         enemyHealth = GetComponent<Health>();
         // Finds the movement component on this enemy.
@@ -122,7 +150,18 @@ public class MyEnemyAI : MonoBehaviour
             return;
         }
 
-        // Other states don't have their behavior implemented yet.
+        // Handle chasing separately from patrolling.
+        if (currentState == AIState.ChasingOpponent)
+        {
+            // Respect stops requested by other game systems.
+            if (agent.isStopped)
+                return;
+
+            ChaseOpponent();
+            return;
+        }
+
+        // Only patrolling enemies continue to the patrol code below.
         if (currentState != AIState.Patrolling)
             return;
 
@@ -132,8 +171,19 @@ public class MyEnemyAI : MonoBehaviour
             return;
         }
 
-        // Look for a weapon while continuing our patrol.
+        // Unarmed enemies look for a weapon while patrolling.
         SearchForWeapon();
+
+        // Stop patrol logic if we just started pursuing a weapon.
+        if (currentState != AIState.Patrolling)
+            return;
+
+        // Armed enemies look for nearby opponents.
+        SearchForOpponent();
+
+        // Stop patrol logic if we just started chasing.
+        if (currentState != AIState.Patrolling)
+            return;
 
         // Wait while Unity is calculating the path.
         if (agent.pathPending)
@@ -320,6 +370,12 @@ public class MyEnemyAI : MonoBehaviour
         // Remember that this enemy is now armed.
         hasWeapon = true;
 
+        // Show the rifle after collecting a weapon.
+        if (weaponModel != null)
+        {
+            weaponModel.SetActive(true);
+        }
+
         // Stop tracking the pickup we just collected.
         targetWeapon = null;
 
@@ -335,5 +391,118 @@ public class MyEnemyAI : MonoBehaviour
         }
 
         Debug.Log(gameObject.name + " collected a weapon.", gameObject);
+    }
+
+    // Finds the closest living character within our detection radius.
+    private Health FindNearestOpponent()
+    {
+        Collider[] nearbyObjects = Physics.OverlapSphere(
+            transform.position,
+            detectionRadius,
+            ~0,
+            QueryTriggerInteraction.Ignore);
+
+        Health nearestOpponent = null;
+        float nearestDistance = Mathf.Infinity;
+
+        foreach (Collider nearbyObject in nearbyObjects)
+        {
+            // Find the character's health component.
+            Health opponent = nearbyObject.GetComponentInParent<Health>();
+
+            // Ignore objects without health, ourselves, and dead characters.
+            if (opponent == null || opponent == enemyHealth || opponent.isDead)
+                continue;
+
+            float distance = Vector3.Distance(
+                transform.position,
+                opponent.transform.position);
+
+            // Keep the closest opponent inside our detection range.
+            if (distance <= detectionRadius && distance < nearestDistance)
+            {
+                nearestOpponent = opponent;
+                nearestDistance = distance;
+            }
+        }
+
+        return nearestOpponent;
+    }
+
+    // Periodically looks for an opponent when we have a weapon.
+    private void SearchForOpponent()
+    {
+        if (!hasWeapon)
+            return;
+
+        opponentSearchTimer -= Time.deltaTime;
+
+        if (opponentSearchTimer > 0f)
+            return;
+
+        opponentSearchTimer = opponentSearchInterval;
+
+        Health foundOpponent = FindNearestOpponent();
+
+        // Only print a message when we find a different target.
+        if (foundOpponent != null && foundOpponent != targetOpponent)
+        {
+            Debug.Log(
+                gameObject.name + " spotted: " + foundOpponent.gameObject.name,
+                gameObject);
+        }
+
+        // Also clears our target if no living opponent is nearby.
+        targetOpponent = foundOpponent;
+
+        // Switch from patrolling to chasing when we find someone.
+        if (targetOpponent != null)
+        {
+            currentState = AIState.ChasingOpponent;
+            chaseTimer = 0f;
+            waitTimer = 0f;
+        }
+    }
+
+    private void ChaseOpponent()
+    {
+        // Give up if the opponent disappears, dies, or leaves our range.
+        if (targetOpponent == null || targetOpponent.isDead ||
+            Vector3.Distance(transform.position,
+                targetOpponent.transform.position) > detectionRadius)
+        {
+            targetOpponent = null;
+            currentState = AIState.Patrolling;
+            agent.ResetPath();
+            waitTimer = 0f;
+            ChoosePatrolDestination();
+            return;
+        }
+
+        // Update the route periodically instead of every frame.
+        chaseTimer -= Time.deltaTime;
+
+        if (chaseTimer > 0f)
+            return;
+
+        chaseTimer = chaseUpdateInterval;
+
+        NavMeshPath path = new NavMeshPath();
+
+        // Only follow a route that reaches the opponent.
+        if (agent.CalculatePath(targetOpponent.transform.position, path)
+            && path.status == NavMeshPathStatus.PathComplete)
+        {
+            agent.SetPath(path);
+        }
+        else
+        {
+            // Return to patrolling if we cannot reach them.
+            targetOpponent = null;
+            currentState = AIState.Patrolling;
+            agent.ResetPath();
+            waitTimer = 0f;
+            ChoosePatrolDestination();
+        }
     }
 }
