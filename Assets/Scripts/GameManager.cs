@@ -88,15 +88,26 @@ public class GameManager : MonoBehaviour
 
 
 
+    //public void GameOver(bool isPlayerWin)
+    //{
+    //    onGameOver?.Raise(isPlayerWin);
+
+    //    if(!isPlayerWin) {
+    //        onAlreadyGameOver?.Raise(true);
+    //    }
+    //}
+
     public void GameOver(bool isPlayerWin)
     {
-        onGameOver?.Raise(isPlayerWin);
-        
-        if(!isPlayerWin) {
-            onAlreadyGameOver?.Raise(true);
-        }
-    }
+        // Stop treating the match as active.
+        startGame = false;
 
+        // Keep the existing win/loss notification.
+        onGameOver?.Raise(isPlayerWin);
+
+        // Tell enemies the match has ended for either result.
+        onAlreadyGameOver?.Raise(true);
+    }
 
     public void StartNewGame()
     {
