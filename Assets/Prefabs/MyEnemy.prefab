@@ -271,10 +271,11 @@ MonoBehaviour:
   detectionRadius: 30
   opponentSearchInterval: 0.5
   chaseUpdateInterval: 0.5
-  attackRange: 10
+  attackRange: 50
   bulletPrefab: {fileID: 5932254332753017937, guid: 96ba0ab60ef972c46af79231e7f0709f, type: 3}
   shootPoint: {fileID: 8155180318207352532}
-  fireInterval: 0.5
+  fireInterval: 0.25
+  muzzleFlash: {fileID: 3787340127228097299}
 --- !u!1001 &3787340127228065205
 PrefabInstance:
   m_ObjectHideFlags: 0
