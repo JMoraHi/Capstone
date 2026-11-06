@@ -267,7 +267,14 @@ MonoBehaviour:
   waitTime: 2
   weaponSearchRadius: 25
   weaponSearchInterval: 1
-  weaponModel: {fileID: 919132149155446097, guid: 2bf4affd4b40eec4480c2745627b992b, type: 3}
+  weaponModel: {fileID: 5953999890668219197}
+  detectionRadius: 30
+  opponentSearchInterval: 0.5
+  chaseUpdateInterval: 0.5
+  attackRange: 10
+  bulletPrefab: {fileID: 5932254332753017937, guid: 96ba0ab60ef972c46af79231e7f0709f, type: 3}
+  shootPoint: {fileID: 8155180318207352532}
+  fireInterval: 0.5
 --- !u!1001 &3787340127228065205
 PrefabInstance:
   m_ObjectHideFlags: 0

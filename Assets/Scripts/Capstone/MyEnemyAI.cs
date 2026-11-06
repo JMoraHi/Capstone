@@ -88,6 +88,26 @@ public class MyEnemyAI : MonoBehaviour
     [SerializeField] private float chaseUpdateInterval = 0.5f;
     private float chaseTimer = 0f;
 
+    // References the existing animation component.
+    private EnemyAnimation enemyAnimation;
+
+    [Header("Combat Settings")]
+
+    // How close we want to get before stopping to attack.
+    [SerializeField] private float attackRange = 10f;
+
+    // The existing bullet prefab that we will spawn when firing.
+    [SerializeField] private GameObject bulletPrefab;
+
+    // The point at the rifle's muzzle where bullets appear.
+    [SerializeField] private Transform shootPoint;
+
+    // Time between shots. 0.5 means two shots per second.
+    [SerializeField] private float fireInterval = 0.5f;
+
+    // The time when the next shot is allowed.
+    private float fireTimer = 0f;
+
     private void Start()
     {
         // Enemies begin without a visible weapon.
@@ -98,6 +118,10 @@ public class MyEnemyAI : MonoBehaviour
 
         // Finds this enemy's health component.
         enemyHealth = GetComponent<Health>();
+
+        // Finds this enemy's animation component so we can change its animations.
+        enemyAnimation = GetComponent<EnemyAnimation>();
+
         // Finds the movement component on this enemy.
         agent = GetComponent<NavMeshAgent>();
 
@@ -455,12 +479,18 @@ public class MyEnemyAI : MonoBehaviour
         // Also clears our target if no living opponent is nearby.
         targetOpponent = foundOpponent;
 
-        // Switch from patrolling to chasing when we find someone.
+        // Switch to chasing and play the rifle-running animation.
         if (targetOpponent != null)
         {
             currentState = AIState.ChasingOpponent;
             chaseTimer = 0f;
             waitTimer = 0f;
+
+            if (enemyAnimation != null && enemyAnimation.animator != null)
+            {
+                enemyAnimation.animator.CrossFade(
+                    enemyAnimation.RIFLE_RUN_PARAM, 0.2f);
+            }
         }
     }
 
@@ -477,6 +507,44 @@ public class MyEnemyAI : MonoBehaviour
             waitTimer = 0f;
             ChoosePatrolDestination();
             return;
+        }
+
+        // Measure how far away our opponent is.
+        float distanceToOpponent = Vector3.Distance(
+            transform.position, targetOpponent.transform.position);
+
+        // Stop moving when we're close enough.
+        if (distanceToOpponent <= attackRange)
+        {
+            // Only change the animation when we stop following a path.
+            if (agent.hasPath)
+            {
+                agent.ResetPath();
+
+                if (enemyAnimation != null && enemyAnimation.animator != null)
+                {
+                    // Stand with the rifle ready.
+                    enemyAnimation.animator.CrossFade(
+                        enemyAnimation.IDLE_PARAM, 0.2f);
+                }
+            }
+
+            // Prepare to update our route immediately if they move away.
+            chaseTimer = 0f;
+
+            // Fire while the opponent is within attack range.
+            ShootAtOpponent();
+            return;
+        }
+
+        // The opponent moved away, so start running again.
+        if (!agent.hasPath)
+        {
+            if (enemyAnimation != null && enemyAnimation.animator != null)
+            {
+                enemyAnimation.animator.CrossFade(
+                    enemyAnimation.RIFLE_RUN_PARAM, 0.2f);
+            }
         }
 
         // Update the route periodically instead of every frame.
@@ -503,6 +571,56 @@ public class MyEnemyAI : MonoBehaviour
             agent.ResetPath();
             waitTimer = 0f;
             ChoosePatrolDestination();
+        }
+    }
+
+    private void ShootAtOpponent()
+    {
+        // We need a living target and both shooting references.
+        if (targetOpponent == null || targetOpponent.isDead ||
+            bulletPrefab == null || shootPoint == null)
+            return;
+
+        // Aim at the character's collider center instead of their feet.
+        Collider targetCollider = targetOpponent.GetComponent<Collider>();
+
+        Vector3 aimPoint = targetCollider != null
+            ? targetCollider.bounds.center
+            : targetOpponent.transform.position + Vector3.up * 2f;
+
+        // Turn the enemy toward the opponent without tilting its body.
+        Vector3 facingDirection =
+            targetOpponent.transform.position - transform.position;
+        facingDirection.y = 0f;
+
+        if (facingDirection.sqrMagnitude > 0.001f)
+            transform.rotation = Quaternion.LookRotation(facingDirection);
+
+        // Wait until we can fire again.
+        if (Time.time < fireTimer)
+            return;
+
+        Vector3 shotDirection = aimPoint - shootPoint.position;
+
+        if (shotDirection.sqrMagnitude < 0.001f)
+            return;
+
+        // fireTimer now stores the time when the next shot is allowed.
+        fireTimer = Time.time + Mathf.Max(fireInterval, 0.05f);
+
+        // Spawn the existing bullet, pointing toward the opponent.
+        GameObject bullet = Instantiate(
+            bulletPrefab,
+            shootPoint.position,
+            Quaternion.LookRotation(shotDirection));
+
+        // Prevent the bullet from hitting the enemy that fired it.
+        foreach (Collider bulletCollider in bullet.GetComponentsInChildren<Collider>())
+        {
+            foreach (Collider ownCollider in GetComponentsInChildren<Collider>())
+            {
+                Physics.IgnoreCollision(bulletCollider, ownCollider);
+            }
         }
     }
 }
