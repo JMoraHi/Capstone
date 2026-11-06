@@ -108,8 +108,17 @@ public class MyEnemyAI : MonoBehaviour
     // The time when the next shot is allowed.
     private float fireTimer = 0f;
 
+    // Remembers whether we have started the firing animation.
+    private bool isFiringAnimation = false;
+
+    // The muzzle-flash object already attached to the rifle.
+    [SerializeField] private GameObject muzzleFlash;
+
     private void Start()
     {
+        // Keep the flash hidden until we fire.
+        HideMuzzleFlash();
+
         // Enemies begin without a visible weapon.
         if (weaponModel != null)
         {
@@ -483,6 +492,8 @@ public class MyEnemyAI : MonoBehaviour
         if (targetOpponent != null)
         {
             currentState = AIState.ChasingOpponent;
+            // Reset the firing flag when starting a new chase.
+            isFiringAnimation = false;
             chaseTimer = 0f;
             waitTimer = 0f;
 
@@ -513,33 +524,37 @@ public class MyEnemyAI : MonoBehaviour
         float distanceToOpponent = Vector3.Distance(
             transform.position, targetOpponent.transform.position);
 
-        // Stop moving when we're close enough.
-        if (distanceToOpponent <= attackRange)
+        // Only stop to fire when we're close enough and the shot is clear.
+        if (distanceToOpponent <= attackRange && HasClearShot())
         {
-            // Only change the animation when we stop following a path.
-            if (agent.hasPath)
+            // Switch to the firing animation once when we enter attack range.
+            if (!isFiringAnimation)
             {
+                isFiringAnimation = true;
                 agent.ResetPath();
 
                 if (enemyAnimation != null && enemyAnimation.animator != null)
                 {
-                    // Stand with the rifle ready.
                     enemyAnimation.animator.CrossFade(
-                        enemyAnimation.IDLE_PARAM, 0.2f);
+                        enemyAnimation.FIRING_PARAM, 0.2f);
                 }
             }
 
             // Prepare to update our route immediately if they move away.
             chaseTimer = 0f;
 
-            // Fire while the opponent is within attack range.
+           
+            // Wait until we can fire again.
             ShootAtOpponent();
             return;
         }
 
         // The opponent moved away, so start running again.
-        if (!agent.hasPath)
+        if (isFiringAnimation || !agent.hasPath)
         {
+            // We are no longer playing the firing animation.
+            isFiringAnimation = false;
+
             if (enemyAnimation != null && enemyAnimation.animator != null)
             {
                 enemyAnimation.animator.CrossFade(
@@ -599,6 +614,9 @@ public class MyEnemyAI : MonoBehaviour
         // Wait until we can fire again.
         if (Time.time < fireTimer)
             return;
+        // Check again after turning, because the gun's position may change.
+        if (!HasClearShot())
+            return;
 
         Vector3 shotDirection = aimPoint - shootPoint.position;
 
@@ -614,6 +632,18 @@ public class MyEnemyAI : MonoBehaviour
             shootPoint.position,
             Quaternion.LookRotation(shotDirection));
 
+        // Briefly show the flash for this shot.
+        if (muzzleFlash != null)
+        {
+            // Restart the effect, even if the previous flash is still active.
+            CancelInvoke(nameof(HideMuzzleFlash));
+            muzzleFlash.SetActive(false);
+            muzzleFlash.SetActive(true);
+
+            // Hide it again after 0.05 seconds.
+            Invoke(nameof(HideMuzzleFlash), 0.05f);
+        }
+
         // Prevent the bullet from hitting the enemy that fired it.
         foreach (Collider bulletCollider in bullet.GetComponentsInChildren<Collider>())
         {
@@ -621,6 +651,83 @@ public class MyEnemyAI : MonoBehaviour
             {
                 Physics.IgnoreCollision(bulletCollider, ownCollider);
             }
+        }
+    }
+
+    // Turns off the flash after a shot.
+    private void HideMuzzleFlash()
+    {
+        if (muzzleFlash != null)
+            muzzleFlash.SetActive(false);
+    }
+
+    // Checks whether the path from the gun to the opponent is clear.
+    private bool HasClearShot()
+    {
+        if (targetOpponent == null || shootPoint == null)
+            return false;
+
+        // Aim at the same position used by our shooting method.
+        Collider targetCollider = targetOpponent.GetComponent<Collider>();
+
+        Vector3 aimPoint = targetCollider != null
+            ? targetCollider.bounds.center
+            : targetOpponent.transform.position + Vector3.up * 2f;
+
+        Vector3 direction = aimPoint - shootPoint.position;
+        float distance = direction.magnitude;
+
+        if (distance < 0.001f)
+            return false;
+
+        // Check everything along the shot, ignoring trigger volumes.
+        RaycastHit[] hits = Physics.RaycastAll(
+            shootPoint.position,
+            direction.normalized,
+            distance,
+            ~0,
+            QueryTriggerInteraction.Ignore);
+
+        foreach (RaycastHit hit in hits)
+        {
+            // Ignore our own body and attached equipment.
+            if (hit.transform.IsChildOf(transform))
+                continue;
+
+            // Hitting the intended opponent is allowed.
+            if (hit.collider.GetComponentInParent<Health>() == targetOpponent)
+                continue;
+
+            // Anything else along the shot blocks it.
+            return false;
+        }
+
+        return true;
+    }
+
+    // Stop combat and return to patrolling.
+    private void ReturnToPatrol()
+    {
+        targetOpponent = null;
+        currentState = AIState.Patrolling;
+        isFiringAnimation = false;
+        waitTimer = 0f;
+
+        // Immediately stop any remaining muzzle flash.
+        CancelInvoke(nameof(HideMuzzleFlash));
+        HideMuzzleFlash();
+
+        agent.ResetPath();
+        ChoosePatrolDestination();
+
+        if (enemyAnimation != null && enemyAnimation.animator != null)
+        {
+            // Run if we found a patrol route; otherwise stand ready.
+            enemyAnimation.animator.CrossFade(
+                agent.hasPath
+                    ? enemyAnimation.RIFLE_RUN_PARAM
+                    : enemyAnimation.IDLE_PARAM,
+                0.2f);
         }
     }
 }
