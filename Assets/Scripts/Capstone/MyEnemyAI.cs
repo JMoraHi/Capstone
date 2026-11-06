@@ -151,18 +151,34 @@ public class MyEnemyAI : MonoBehaviour
 
     private void Update()
     {
-        // Skip movement checks if the agent isn't ready.
-        if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh)
-            return;
-
-        // Death takes priority over patrolling.
+        // Handle death before checking whether movement is available.
         if (enemyHealth != null && enemyHealth.isDead)
         {
             currentState = AIState.Dead;
-            agent.isStopped = true;
-            agent.ResetPath();
+
+            // Clear our targets and firing flag.
+            targetOpponent = null;
+            targetWeapon = null;
+            isFiringAnimation = false;
+
+            // Stop any remaining muzzle flash.
+            CancelInvoke(nameof(HideMuzzleFlash));
+            HideMuzzleFlash();
+
+            // Stop moving if the navigation component is still available.
+            if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.ResetPath();
+            }
+
+            // Don't run any more AI behavior after death.
             return;
         }
+
+        // Skip movement checks if the agent isn't ready.
+        if (agent == null || !agent.isActiveAndEnabled || !agent.isOnNavMesh)
+            return;
 
         // Handle traveling toward a weapon.
         if (currentState == AIState.SearchingForWeapon)
@@ -183,8 +199,10 @@ public class MyEnemyAI : MonoBehaviour
             return;
         }
 
-        // Handle chasing separately from patrolling.
-        if (currentState == AIState.ChasingOpponent)
+
+        // Both combat states use the same range and visibility checks.
+        if (currentState == AIState.ChasingOpponent ||
+            currentState == AIState.Attacking)
         {
             // Respect stops requested by other game systems.
             if (agent.isStopped)
@@ -230,6 +248,13 @@ public class MyEnemyAI : MonoBehaviour
             return;
         }
 
+        // Switch to idle once when an armed enemy begins waiting.
+        if (waitTimer == 0f && hasWeapon &&
+            enemyAnimation != null && enemyAnimation.animator != null)
+        {
+            enemyAnimation.animator.CrossFade(
+                enemyAnimation.IDLE_PARAM, 0.2f);
+        }
         // Count how long we've been waiting.
         waitTimer += Time.deltaTime;
 
@@ -239,6 +264,8 @@ public class MyEnemyAI : MonoBehaviour
             waitTimer = 0f;
             ChoosePatrolDestination();
         }
+
+
     }
 
     private void ChoosePatrolDestination()
@@ -286,6 +313,14 @@ public class MyEnemyAI : MonoBehaviour
             // Follow the path we found.
             agent.isStopped = false;
             agent.SetPath(path);
+
+            // Play rifle-running when an armed enemy starts a patrol route.
+            if (hasWeapon && enemyAnimation != null &&
+                enemyAnimation.animator != null)
+            {
+                enemyAnimation.animator.CrossFade(
+                    enemyAnimation.RIFLE_RUN_PARAM, 0.2f);
+            }
 
             // We found a destination, so stop trying other locations.
             return;
@@ -512,11 +547,8 @@ public class MyEnemyAI : MonoBehaviour
             Vector3.Distance(transform.position,
                 targetOpponent.transform.position) > detectionRadius)
         {
-            targetOpponent = null;
-            currentState = AIState.Patrolling;
-            agent.ResetPath();
-            waitTimer = 0f;
-            ChoosePatrolDestination();
+            // Stop combat and resume patrolling.
+            ReturnToPatrol();
             return;
         }
 
@@ -527,6 +559,11 @@ public class MyEnemyAI : MonoBehaviour
         // Only stop to fire when we're close enough and the shot is clear.
         if (distanceToOpponent <= attackRange && HasClearShot())
         {
+            // Show that we are close enough and have a clear shot.
+            currentState = AIState.Attacking;
+
+
+
             // Switch to the firing animation once when we enter attack range.
             if (!isFiringAnimation)
             {
@@ -543,11 +580,15 @@ public class MyEnemyAI : MonoBehaviour
             // Prepare to update our route immediately if they move away.
             chaseTimer = 0f;
 
-           
+
             // Wait until we can fire again.
             ShootAtOpponent();
             return;
         }
+
+        // Resume chasing when we're too far away or the shot is blocked.
+        currentState = AIState.ChasingOpponent;
+
 
         // The opponent moved away, so start running again.
         if (isFiringAnimation || !agent.hasPath)
@@ -580,12 +621,8 @@ public class MyEnemyAI : MonoBehaviour
         }
         else
         {
-            // Return to patrolling if we cannot reach them.
-            targetOpponent = null;
-            currentState = AIState.Patrolling;
-            agent.ResetPath();
-            waitTimer = 0f;
-            ChoosePatrolDestination();
+            // Stop combat and resume patrolling.
+            ReturnToPatrol();
         }
     }
 
@@ -729,5 +766,41 @@ public class MyEnemyAI : MonoBehaviour
                     : enemyAnimation.IDLE_PARAM,
                 0.2f);
         }
+    }
+
+    // Clean up the firing effect when this AI or enemy is disabled.
+    private void OnDisable()
+    {
+        // Cancel the scheduled flash callback and hide the effect now.
+        CancelInvoke(nameof(HideMuzzleFlash));
+        HideMuzzleFlash();
+
+        // Reset the flag so the firing animation can restart if needed.
+        isFiringAnimation = false;
+    }
+
+    // Stop this enemy when the match ends.
+    public void StopForGameOver()
+    {
+        targetOpponent = null;
+        targetWeapon = null;
+
+        // Stop movement if navigation is still available.
+        if (agent != null && agent.isActiveAndEnabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.ResetPath();
+        }
+
+        // Don't replace a dead enemy's animation with idle.
+        if (enemyHealth != null && !enemyHealth.isDead &&
+            enemyAnimation != null && enemyAnimation.animator != null)
+        {
+            enemyAnimation.animator.CrossFade(
+                enemyAnimation.IDLE_PARAM, 0.2f);
+        }
+
+        // Disabling this AI stops Update and runs our OnDisable cleanup.
+        enabled = false;
     }
 }
